@@ -1,0 +1,72 @@
+{
+  "name": "codelens-ai",
+  "displayName": "CodeLens AI",
+  "description": "Keyword-driven Java framework intelligence — architecture graph, keyword inventory, dependency flow",
+  "version": "0.1.0",
+  "publisher": "codelens-ai",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other", "Testing"],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "icon": "resources/icon.png",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codelens-ai.analyzeWorkspace",
+        "title": "CodeLens AI: Analyze Workspace"
+      },
+      {
+        "command": "codelens-ai.analyzeFolder",
+        "title": "CodeLens AI: Analyze This Folder"
+      },
+      {
+        "command": "codelens-ai.openSettings",
+        "title": "CodeLens AI: Configure LLM Provider"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "codelens-ai.analyzeFolder",
+          "when": "explorerResourceIsFolder",
+          "group": "navigation"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codelens-ai",
+          "title": "CodeLens AI",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "codelens-ai": [
+        {
+          "type": "webview",
+          "id": "codelens-ai.sidebar",
+          "name": "Framework Analyzer"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -watch -p tsconfig.json",
+    "package": "vsce package --no-dependencies",
+    "tsc": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@codelens-ai/core": "workspace:*",
+    "@anthropic-ai/sdk": "^0.27.0",
+    "openai": "^4.52.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.26.0",
+    "typescript": "^5.4.0"
+  }
+}

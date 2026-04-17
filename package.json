@@ -1,0 +1,17 @@
+{
+  "name": "codelens-ai",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"pnpm dev:server\" \"pnpm dev:web\"",
+    "dev:server": "cd packages/server && uvicorn main:app --reload --port 8000",
+    "dev:web": "pnpm --filter web dev",
+    "build:web": "pnpm --filter core build && pnpm --filter web build",
+    "build:ext": "pnpm --filter core build && pnpm --filter vscode build && pnpm --filter vscode package",
+    "build:docker": "docker build -t codelens-ai .",
+    "lint": "pnpm --filter core lint && pnpm --filter web lint",
+    "typecheck": "pnpm --filter core tsc --noEmit && pnpm --filter web tsc --noEmit && pnpm --filter vscode tsc --noEmit"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

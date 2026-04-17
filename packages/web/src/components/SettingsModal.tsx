@@ -4,11 +4,12 @@ import { apiCallLLM } from '../api'
 import type { LLMConfig, LLMProvider } from '@codelens-ai/core'
 
 const PROVIDERS: { id: LLMProvider; label: string }[] = [
-  { id: 'anthropic', label: 'Claude (Anthropic)' },
+  { id: 'anthropic', label: 'Claude' },
   { id: 'openai', label: 'OpenAI' },
   { id: 'azure', label: 'Azure OpenAI' },
   { id: 'openrouter', label: 'OpenRouter' },
-  { id: 'gemini', label: 'Google Gemini' },
+  { id: 'gemini', label: 'Gemini' },
+  { id: 'enterprise', label: 'Enterprise' },
 ]
 
 const DEFAULT_MODELS: Record<LLMProvider, string> = {
@@ -17,6 +18,7 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
   azure: 'gpt-4o',
   openrouter: 'meta-llama/llama-3.1-8b-instruct',
   gemini: 'gemini-1.5-pro',
+  enterprise: '',
 }
 
 const MODEL_OPTIONS: Record<LLMProvider, string[]> = {
@@ -25,6 +27,15 @@ const MODEL_OPTIONS: Record<LLMProvider, string[]> = {
   azure: [],
   openrouter: [],
   gemini: ['gemini-1.5-pro', 'gemini-1.5-flash'],
+  enterprise: [],
+}
+
+interface EnterpriseConfig {
+  baseUrl: string
+  headerName: string
+  promptField: string
+  contextField: string
+  responseField: string
 }
 
 function loadKey(provider: LLMProvider): string {
@@ -33,6 +44,18 @@ function loadKey(provider: LLMProvider): string {
 
 function saveKey(provider: LLMProvider, key: string) {
   localStorage.setItem(`codelens-apikey-${provider}`, key)
+}
+
+function loadEnterprise(): EnterpriseConfig {
+  try {
+    const raw = localStorage.getItem('codelens-enterprise-config')
+    if (raw) return JSON.parse(raw) as EnterpriseConfig
+  } catch {}
+  return { baseUrl: '', headerName: 'x-api-key', promptField: 'prompt', contextField: 'context', responseField: 'response' }
+}
+
+function saveEnterprise(cfg: EnterpriseConfig) {
+  localStorage.setItem('codelens-enterprise-config', JSON.stringify(cfg))
 }
 
 interface Props {
@@ -47,6 +70,7 @@ export default function SettingsModal({ onClose }: Props) {
   const [model, setModel] = useState(settings?.model ?? DEFAULT_MODELS['anthropic'])
   const [baseUrl, setBaseUrl] = useState(settings?.baseUrl ?? '')
   const [apiVersion, setApiVersion] = useState(settings?.apiVersion ?? '2024-02-01')
+  const [enterprise, setEnterprise] = useState<EnterpriseConfig>(loadEnterprise)
   const [testStatus, setTestStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle')
   const [testError, setTestError] = useState('')
 
@@ -57,14 +81,30 @@ export default function SettingsModal({ onClose }: Props) {
     setTestStatus('idle')
   }, [provider])
 
+  function setEnterpriseField(field: keyof EnterpriseConfig, value: string) {
+    setEnterprise(prev => ({ ...prev, [field]: value }))
+  }
+
   function handleSave() {
     saveKey(provider, apiKey)
+    if (provider === 'enterprise') saveEnterprise(enterprise)
+
     const cfg: LLMConfig = {
       provider,
       apiKey,
       model,
-      ...(baseUrl ? { baseUrl } : {}),
+      ...(baseUrl || (provider === 'enterprise' && enterprise.baseUrl)
+        ? { baseUrl: provider === 'enterprise' ? enterprise.baseUrl : baseUrl }
+        : {}),
       ...(provider === 'azure' && apiVersion ? { apiVersion } : {}),
+      ...(provider === 'enterprise'
+        ? {
+            headerName: enterprise.headerName || 'x-api-key',
+            promptField: enterprise.promptField || 'prompt',
+            contextField: enterprise.contextField || 'context',
+            responseField: enterprise.responseField || 'response',
+          }
+        : {}),
     }
     setSettings(cfg)
     onClose()
@@ -74,26 +114,52 @@ export default function SettingsModal({ onClose }: Props) {
     setTestStatus('testing')
     setTestError('')
     try {
-      const result = await apiCallLLM({
+      const cfg: LLMConfig = {
         provider,
         apiKey,
         model,
-        baseUrl: baseUrl || undefined,
-        apiVersion: apiVersion || undefined,
+        baseUrl: provider === 'enterprise' ? enterprise.baseUrl : baseUrl || undefined,
+        apiVersion: provider === 'azure' ? apiVersion : undefined,
+        ...(provider === 'enterprise'
+          ? {
+              headerName: enterprise.headerName || 'x-api-key',
+              promptField: enterprise.promptField || 'prompt',
+              contextField: enterprise.contextField || 'context',
+              responseField: enterprise.responseField || 'response',
+            }
+          : {}),
+      }
+
+      const testPrompt =
+        provider === 'enterprise'
+          ? 'Reply with the word CONNECTED and nothing else.'
+          : 'Say "hi" in exactly one word.'
+
+      const result = await apiCallLLM({
+        ...cfg,
         system: 'You are a helpful assistant.',
-        prompt: 'Say "hi" in exactly one word.',
+        prompt: testPrompt,
       })
-      if (result) {
+
+      if (provider === 'enterprise' && !result.includes('CONNECTED')) {
+        setTestStatus('error')
+        setTestError(`Unexpected response: ${result.slice(0, 100)}`)
+      } else if (result) {
         setTestStatus('ok')
       } else {
         setTestStatus('error')
-        setTestError('Empty response from LLM')
+        setTestError('Empty response')
       }
     } catch (err) {
       setTestStatus('error')
       setTestError((err as Error).message)
     }
   }
+
+  const ep = enterprise
+  const enterprisePreview = provider === 'enterprise'
+    ? `POST ${ep.baseUrl || '{baseUrl}'}/llm/invoke\n{ "${ep.promptField || 'prompt'}": "...", "${ep.contextField || 'context'}": "" }\nHeader: ${ep.headerName || 'x-api-key'}: your-key`
+    : ''
 
   return (
     <div
@@ -114,7 +180,7 @@ export default function SettingsModal({ onClose }: Props) {
           border: '1px solid #30363d',
           borderRadius: 10,
           width: 480,
-          maxHeight: '85vh',
+          maxHeight: '88vh',
           overflowY: 'auto',
           padding: 24,
         }}
@@ -193,43 +259,134 @@ export default function SettingsModal({ onClose }: Props) {
           </>
         )}
 
-        {/* Model */}
-        <section style={{ marginBottom: 20 }}>
-          <label style={labelStyle}>Model</label>
-          {MODEL_OPTIONS[provider].length > 0 ? (
-            <select
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              style={{ ...inputStyle, cursor: 'pointer' }}
-            >
-              {MODEL_OPTIONS[provider].map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          ) : (
-            <input
-              type="text"
-              value={model}
-              onChange={(e) => setModel(e.target.value)}
-              placeholder={DEFAULT_MODELS[provider]}
-              style={inputStyle}
-            />
-          )}
-        </section>
+        {/* Enterprise extras */}
+        {provider === 'enterprise' && (
+          <>
+            <section style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>Base URL *</label>
+              <input
+                type="text"
+                value={ep.baseUrl}
+                onChange={(e) => setEnterpriseField('baseUrl', e.target.value)}
+                placeholder="https://internal-api.company.com"
+                style={inputStyle}
+              />
+            </section>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+              <section>
+                <label style={labelStyle}>API Key Header</label>
+                <input
+                  type="text"
+                  value={ep.headerName}
+                  onChange={(e) => setEnterpriseField('headerName', e.target.value)}
+                  placeholder="x-api-key"
+                  style={inputStyle}
+                />
+              </section>
+              <section>
+                <label style={labelStyle}>Model (optional)</label>
+                <input
+                  type="text"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="optional"
+                  style={inputStyle}
+                />
+              </section>
+              <section>
+                <label style={labelStyle}>Prompt Body Field</label>
+                <input
+                  type="text"
+                  value={ep.promptField}
+                  onChange={(e) => setEnterpriseField('promptField', e.target.value)}
+                  placeholder="prompt"
+                  style={inputStyle}
+                />
+              </section>
+              <section>
+                <label style={labelStyle}>Context Body Field</label>
+                <input
+                  type="text"
+                  value={ep.contextField}
+                  onChange={(e) => setEnterpriseField('contextField', e.target.value)}
+                  placeholder="context"
+                  style={inputStyle}
+                />
+              </section>
+            </div>
+            <section style={{ marginBottom: 16 }}>
+              <label style={labelStyle}>Response JSON Field</label>
+              <input
+                type="text"
+                value={ep.responseField}
+                onChange={(e) => setEnterpriseField('responseField', e.target.value)}
+                placeholder="response  (or dot-path: data.result.text)"
+                style={inputStyle}
+              />
+            </section>
+            {/* Live preview */}
+            <div style={{
+              background: '#0d1117',
+              border: '1px solid #21262d',
+              borderRadius: 6,
+              padding: '10px 12px',
+              marginBottom: 16,
+              fontSize: 11,
+              fontFamily: 'monospace',
+              color: '#8b949e',
+              whiteSpace: 'pre',
+              lineHeight: 1.7,
+            }}>
+              {enterprisePreview}
+            </div>
+          </>
+        )}
+
+        {/* Model — skip for enterprise (handled above in grid) */}
+        {provider !== 'enterprise' && (
+          <section style={{ marginBottom: 20 }}>
+            <label style={labelStyle}>Model</label>
+            {MODEL_OPTIONS[provider].length > 0 ? (
+              <select
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                style={{ ...inputStyle, cursor: 'pointer' }}
+              >
+                {MODEL_OPTIONS[provider].map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+                placeholder={DEFAULT_MODELS[provider] || 'model name'}
+                style={inputStyle}
+              />
+            )}
+          </section>
+        )}
 
         {/* Test + Save */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button onClick={handleTest} disabled={!apiKey || testStatus === 'testing'} style={secondaryBtnStyle}>
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <button
+            onClick={handleTest}
+            disabled={!apiKey || testStatus === 'testing'}
+            style={secondaryBtnStyle}
+          >
             {testStatus === 'testing' ? 'Testing…' : 'Test Connection'}
           </button>
           <button onClick={handleSave} disabled={!apiKey} style={primaryBtnStyle}>
             Save
           </button>
           {testStatus === 'ok' && (
-            <span style={{ color: '#3B6D11', fontSize: 13 }}>✓ Connected</span>
+            <span style={{ color: '#3fbf7f', fontSize: 13 }}>✓ Connected</span>
           )}
           {testStatus === 'error' && (
-            <span style={{ color: '#993C1D', fontSize: 12 }}>{testError || 'Connection failed'}</span>
+            <span style={{ color: '#f87171', fontSize: 12, flex: '1 1 100%', marginTop: 6 }}>
+              {testError || 'Connection failed'}
+            </span>
           )}
         </div>
       </div>
@@ -239,17 +396,17 @@ export default function SettingsModal({ onClose }: Props) {
 
 const labelStyle: React.CSSProperties = {
   display: 'block',
-  fontSize: 12,
+  fontSize: 11,
   fontWeight: 600,
   color: '#8b949e',
-  marginBottom: 6,
+  marginBottom: 5,
   textTransform: 'uppercase',
   letterSpacing: '0.05em',
 }
 
 const inputStyle: React.CSSProperties = {
   width: '100%',
-  padding: '8px 12px',
+  padding: '8px 10px',
   background: '#21262d',
   border: '1px solid #30363d',
   borderRadius: 6,
@@ -257,6 +414,7 @@ const inputStyle: React.CSSProperties = {
   fontSize: 13,
   outline: 'none',
   fontFamily: 'inherit',
+  boxSizing: 'border-box',
 }
 
 const primaryBtnStyle: React.CSSProperties = {

@@ -9,8 +9,8 @@ import { WorkspaceReader } from './WorkspaceReader'
 type InboundMessage =
   | { type: 'REQUEST_TREE' }
   | { type: 'REQUEST_FILES'; paths: string[] }
-  | { type: 'LLM_STREAM'; streamId: string; provider: string; apiKey: string; model: string; baseUrl?: string; apiVersion?: string; system: string; prompt: string }
-  | { type: 'LLM_CALL'; callId: string; provider: string; apiKey: string; model: string; baseUrl?: string; apiVersion?: string; system: string; prompt: string }
+  | { type: 'LLM_STREAM'; streamId: string; provider: string; apiKey: string; model: string; baseUrl?: string; apiVersion?: string; promptField?: string; contextField?: string; responseField?: string; headerName?: string; system: string; prompt: string }
+  | { type: 'LLM_CALL'; callId: string; provider: string; apiKey: string; model: string; baseUrl?: string; apiVersion?: string; promptField?: string; contextField?: string; responseField?: string; headerName?: string; system: string; prompt: string }
   | { type: 'SAVE_KEY'; provider: string; apiKey: string }
   | { type: 'GET_SETTINGS' }
 
@@ -99,6 +99,10 @@ export class AnalysisPanel {
           model: msg.model,
           baseUrl: msg.baseUrl,
           apiVersion: msg.apiVersion,
+          promptField: msg.promptField,
+          contextField: msg.contextField,
+          responseField: msg.responseField,
+          headerName: msg.headerName,
         }
         try {
           for await (const token of streamLLM(config, msg.system, msg.prompt)) {
@@ -121,6 +125,10 @@ export class AnalysisPanel {
           model: msg.model,
           baseUrl: msg.baseUrl,
           apiVersion: msg.apiVersion,
+          promptField: msg.promptField,
+          contextField: msg.contextField,
+          responseField: msg.responseField,
+          headerName: msg.headerName,
         }
         try {
           const content = await callLLM(config, msg.system, msg.prompt)

@@ -3,6 +3,7 @@ import { callAnthropic, streamAnthropic } from './anthropic'
 import { callOpenAI, streamOpenAI } from './openai'
 import { callOpenRouter, streamOpenRouter } from './openrouter'
 import { callGemini, streamGemini } from './gemini'
+import { callEnterprise, streamEnterprise } from './enterprise'
 
 export async function callLLM(
   config: LLMConfig,
@@ -19,6 +20,8 @@ export async function callLLM(
       return callOpenRouter(config, system, prompt)
     case 'gemini':
       return callGemini(config, system, prompt)
+    case 'enterprise':
+      return callEnterprise(config, system, prompt)
     default:
       throw new Error(`Unknown provider: ${(config as LLMConfig).provider}`)
   }
@@ -42,6 +45,9 @@ export async function* streamLLM(
       break
     case 'gemini':
       yield* streamGemini(config, system, prompt)
+      break
+    case 'enterprise':
+      yield* streamEnterprise(config, system, prompt)
       break
     default:
       throw new Error(`Unknown provider: ${(config as LLMConfig).provider}`)

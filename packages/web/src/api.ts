@@ -116,6 +116,10 @@ export interface LLMStreamParams {
   model: string
   baseUrl?: string
   apiVersion?: string
+  promptField?: string
+  contextField?: string
+  responseField?: string
+  headerName?: string
   system: string
   prompt: string
 }

@@ -1,4 +1,4 @@
-export type LLMProvider = 'anthropic' | 'openai' | 'azure' | 'openrouter' | 'gemini'
+export type LLMProvider = 'anthropic' | 'openai' | 'azure' | 'openrouter' | 'gemini' | 'enterprise'
 
 export interface LLMConfig {
   provider: LLMProvider
@@ -6,6 +6,10 @@ export interface LLMConfig {
   model: string
   baseUrl?: string
   apiVersion?: string
+  promptField?: string
+  contextField?: string
+  responseField?: string
+  headerName?: string
 }
 
 export type NodeRole =

@@ -11,9 +11,13 @@ router = APIRouter()
 class LLMRequest(BaseModel):
     provider: str
     apiKey: str
-    model: str
+    model: Optional[str] = None
     baseUrl: Optional[str] = None
     apiVersion: Optional[str] = None
+    promptField: Optional[str] = None
+    contextField: Optional[str] = None
+    responseField: Optional[str] = None
+    headerName: Optional[str] = None
     system: str
     prompt: str
 
@@ -24,11 +28,15 @@ async def llm_stream(req: LLMRequest):
         async for token in stream_llm(
             provider=req.provider,
             api_key=req.apiKey,
-            model=req.model,
+            model=req.model or "",
             system=req.system,
             prompt=req.prompt,
             base_url=req.baseUrl,
             api_version=req.apiVersion,
+            prompt_field=req.promptField,
+            context_field=req.contextField,
+            response_field=req.responseField,
+            header_name=req.headerName,
         ):
             yield f"data: {token}\n\n"
         yield "data: [DONE]\n\n"
@@ -41,10 +49,14 @@ async def llm_call(req: LLMRequest):
     content = await call_llm(
         provider=req.provider,
         api_key=req.apiKey,
-        model=req.model,
+        model=req.model or "",
         system=req.system,
         prompt=req.prompt,
         base_url=req.baseUrl,
         api_version=req.apiVersion,
+        prompt_field=req.promptField,
+        context_field=req.contextField,
+        response_field=req.responseField,
+        header_name=req.headerName,
     )
     return {"content": content}

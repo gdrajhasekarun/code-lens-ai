@@ -10,6 +10,10 @@ async def stream_llm(
     prompt: str,
     base_url: Optional[str] = None,
     api_version: Optional[str] = None,
+    prompt_field: Optional[str] = None,
+    context_field: Optional[str] = None,
+    response_field: Optional[str] = None,
+    header_name: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     if provider == "anthropic":
         async for token in _stream_anthropic(api_key, model, system, prompt, base_url):
@@ -23,6 +27,12 @@ async def stream_llm(
     elif provider == "gemini":
         async for token in _stream_gemini(api_key, model, system, prompt, base_url):
             yield token
+    elif provider == "enterprise":
+        async for token in _call_enterprise(
+            api_key, model, system, prompt, base_url,
+            prompt_field, context_field, response_field, header_name
+        ):
+            yield token
     else:
         raise ValueError(f"Unknown provider: {provider}")
 
@@ -35,9 +45,16 @@ async def call_llm(
     prompt: str,
     base_url: Optional[str] = None,
     api_version: Optional[str] = None,
+    prompt_field: Optional[str] = None,
+    context_field: Optional[str] = None,
+    response_field: Optional[str] = None,
+    header_name: Optional[str] = None,
 ) -> str:
     result = []
-    async for token in stream_llm(provider, api_key, model, system, prompt, base_url, api_version):
+    async for token in stream_llm(
+        provider, api_key, model, system, prompt,
+        base_url, api_version, prompt_field, context_field, response_field, header_name
+    ):
         result.append(token)
     return "".join(result)
 
@@ -146,3 +163,57 @@ async def _stream_gemini(
     async for chunk in response:
         if chunk.text:
             yield chunk.text
+
+
+async def _call_enterprise(
+    api_key: str,
+    model: str,
+    system: str,
+    prompt: str,
+    base_url: Optional[str],
+    prompt_field: Optional[str],
+    context_field: Optional[str],
+    response_field: Optional[str],
+    header_name: Optional[str],
+) -> AsyncGenerator[str, None]:
+    if not base_url:
+        raise ValueError("Enterprise provider requires a Base URL")
+
+    pf = prompt_field or "prompt"
+    cf = context_field or "context"
+    rf = response_field or "response"
+    hn = header_name or "x-api-key"
+
+    body: dict = {
+        pf: f"{system}\n\n---\n\n{prompt}",
+        cf: "",
+    }
+    if model:
+        body["model"] = model
+
+    async with httpx.AsyncClient(timeout=120) as client:
+        res = await client.post(
+            f"{base_url}/llm/invoke",
+            json=body,
+            headers={"Content-Type": "application/json", hn: api_key},
+        )
+
+    if not res.is_success:
+        raise ValueError(f"Enterprise API error {res.status_code}: {res.text}")
+
+    data = res.json()
+    # Support nested dot-path like "data.result.text"
+    value = data
+    for key in rf.split("."):
+        if isinstance(value, dict):
+            value = value.get(key)
+        else:
+            value = None
+            break
+
+    if not isinstance(value, str):
+        raise ValueError(
+            f"Enterprise API response did not contain field '{rf}'. Got: {data}"
+        )
+
+    yield value

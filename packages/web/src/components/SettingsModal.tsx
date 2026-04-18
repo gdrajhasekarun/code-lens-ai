@@ -30,12 +30,15 @@ const MODEL_OPTIONS: Record<LLMProvider, string[]> = {
   enterprise: [],
 }
 
+interface ExtraHeader { key: string; value: string }
+
 interface EnterpriseConfig {
   baseUrl: string
   headerName: string
   promptField: string
   contextField: string
   responseField: string
+  extraHeaders: ExtraHeader[]
 }
 
 function loadKey(provider: LLMProvider): string {
@@ -51,7 +54,7 @@ function loadEnterprise(): EnterpriseConfig {
     const raw = localStorage.getItem('codelens-enterprise-config')
     if (raw) return JSON.parse(raw) as EnterpriseConfig
   } catch {}
-  return { baseUrl: '', headerName: 'x-api-key', promptField: 'prompt', contextField: 'context', responseField: 'response' }
+  return { baseUrl: '', headerName: 'x-api-key', promptField: 'prompt', contextField: 'context', responseField: 'response', extraHeaders: [] }
 }
 
 function saveEnterprise(cfg: EnterpriseConfig) {
@@ -81,8 +84,24 @@ export default function SettingsModal({ onClose }: Props) {
     setTestStatus('idle')
   }, [provider])
 
-  function setEnterpriseField(field: keyof EnterpriseConfig, value: string) {
+  function setEnterpriseField(field: keyof Omit<EnterpriseConfig, 'extraHeaders'>, value: string) {
     setEnterprise(prev => ({ ...prev, [field]: value }))
+  }
+
+  function setExtraHeader(index: number, field: 'key' | 'value', val: string) {
+    setEnterprise(prev => {
+      const updated = [...prev.extraHeaders]
+      updated[index] = { ...updated[index], [field]: val }
+      return { ...prev, extraHeaders: updated }
+    })
+  }
+
+  function addExtraHeader() {
+    setEnterprise(prev => ({ ...prev, extraHeaders: [...prev.extraHeaders, { key: '', value: '' }] }))
+  }
+
+  function removeExtraHeader(index: number) {
+    setEnterprise(prev => ({ ...prev, extraHeaders: prev.extraHeaders.filter((_, i) => i !== index) }))
   }
 
   function handleSave() {
@@ -103,6 +122,9 @@ export default function SettingsModal({ onClose }: Props) {
             promptField: enterprise.promptField || 'prompt',
             contextField: enterprise.contextField || 'context',
             responseField: enterprise.responseField || 'response',
+            extraHeaders: Object.fromEntries(
+              enterprise.extraHeaders.filter(h => h.key).map(h => [h.key, h.value])
+            ),
           }
         : {}),
     }
@@ -126,6 +148,9 @@ export default function SettingsModal({ onClose }: Props) {
               promptField: enterprise.promptField || 'prompt',
               contextField: enterprise.contextField || 'context',
               responseField: enterprise.responseField || 'response',
+              extraHeaders: Object.fromEntries(
+                enterprise.extraHeaders.filter(h => h.key).map(h => [h.key, h.value])
+              ),
             }
           : {}),
       }
@@ -157,9 +182,12 @@ export default function SettingsModal({ onClose }: Props) {
   }
 
   const ep = enterprise
-  const enterprisePreview = provider === 'enterprise'
-    ? `POST ${ep.baseUrl || '{baseUrl}'}/llm/invoke\n{ "${ep.promptField || 'prompt'}": "...", "${ep.contextField || 'context'}": "" }\nHeader: ${ep.headerName || 'x-api-key'}: your-key`
-    : ''
+  const enterprisePreview = provider === 'enterprise' ? [
+    `POST ${ep.baseUrl || '{baseUrl}'}/llm/invoke`,
+    `{ "${ep.promptField || 'prompt'}": "...", "${ep.contextField || 'context'}": "" }`,
+    `${ep.headerName || 'x-api-key'}: your-key`,
+    ...ep.extraHeaders.filter(h => h.key).map(h => `${h.key}: ${h.value || '...'}`),
+  ].join('\n') : ''
 
   return (
     <div
@@ -324,6 +352,45 @@ export default function SettingsModal({ onClose }: Props) {
                 style={inputStyle}
               />
             </section>
+            {/* Extra Headers */}
+            <section style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Extra Headers</label>
+                <button onClick={addExtraHeader} style={{ ...secondaryBtnStyle, padding: '3px 10px', fontSize: 11 }}>
+                  + Add
+                </button>
+              </div>
+              {ep.extraHeaders.length === 0 && (
+                <p style={{ color: '#484f58', fontSize: 11 }}>e.g. app-id, client-id, content-type</p>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {ep.extraHeaders.map((h, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      value={h.key}
+                      onChange={(e) => setExtraHeader(i, 'key', e.target.value)}
+                      placeholder="header-name"
+                      style={{ ...inputStyle, flex: '0 0 40%' }}
+                    />
+                    <input
+                      type="text"
+                      value={h.value}
+                      onChange={(e) => setExtraHeader(i, 'value', e.target.value)}
+                      placeholder="value"
+                      style={{ ...inputStyle, flex: 1 }}
+                    />
+                    <button
+                      onClick={() => removeExtraHeader(i)}
+                      style={{ background: 'none', border: 'none', color: '#484f58', cursor: 'pointer', fontSize: 16, padding: '0 4px', flexShrink: 0 }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+
             {/* Live preview */}
             <div style={{
               background: '#0d1117',

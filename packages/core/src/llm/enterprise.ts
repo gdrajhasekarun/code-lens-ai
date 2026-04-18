@@ -23,6 +23,7 @@ export async function callEnterprise(
     headers: {
       'Content-Type': 'application/json',
       [headerName]: config.apiKey,
+      ...config.extraHeaders,
     },
     body: JSON.stringify(body),
   })

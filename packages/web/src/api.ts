@@ -120,6 +120,7 @@ export interface LLMStreamParams {
   contextField?: string
   responseField?: string
   headerName?: string
+  extraHeaders?: Record<string, string>
   system: string
   prompt: string
 }

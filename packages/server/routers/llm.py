@@ -18,6 +18,7 @@ class LLMRequest(BaseModel):
     contextField: Optional[str] = None
     responseField: Optional[str] = None
     headerName: Optional[str] = None
+    extraHeaders: Optional[dict[str, str]] = None
     system: str
     prompt: str
 
@@ -37,6 +38,7 @@ async def llm_stream(req: LLMRequest):
             context_field=req.contextField,
             response_field=req.responseField,
             header_name=req.headerName,
+            extra_headers=req.extraHeaders,
         ):
             yield f"data: {token}\n\n"
         yield "data: [DONE]\n\n"
@@ -58,5 +60,6 @@ async def llm_call(req: LLMRequest):
         context_field=req.contextField,
         response_field=req.responseField,
         header_name=req.headerName,
+        extra_headers=req.extraHeaders,
     )
     return {"content": content}

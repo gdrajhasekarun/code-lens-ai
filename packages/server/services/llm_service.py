@@ -14,6 +14,7 @@ async def stream_llm(
     context_field: Optional[str] = None,
     response_field: Optional[str] = None,
     header_name: Optional[str] = None,
+    extra_headers: Optional[dict] = None,
 ) -> AsyncGenerator[str, None]:
     if provider == "anthropic":
         async for token in _stream_anthropic(api_key, model, system, prompt, base_url):
@@ -30,7 +31,7 @@ async def stream_llm(
     elif provider == "enterprise":
         async for token in _call_enterprise(
             api_key, model, system, prompt, base_url,
-            prompt_field, context_field, response_field, header_name
+            prompt_field, context_field, response_field, header_name, extra_headers
         ):
             yield token
     else:
@@ -49,11 +50,12 @@ async def call_llm(
     context_field: Optional[str] = None,
     response_field: Optional[str] = None,
     header_name: Optional[str] = None,
+    extra_headers: Optional[dict] = None,
 ) -> str:
     result = []
     async for token in stream_llm(
         provider, api_key, model, system, prompt,
-        base_url, api_version, prompt_field, context_field, response_field, header_name
+        base_url, api_version, prompt_field, context_field, response_field, header_name, extra_headers
     ):
         result.append(token)
     return "".join(result)
@@ -175,6 +177,7 @@ async def _call_enterprise(
     context_field: Optional[str],
     response_field: Optional[str],
     header_name: Optional[str],
+    extra_headers: Optional[dict] = None,
 ) -> AsyncGenerator[str, None]:
     if not base_url:
         raise ValueError("Enterprise provider requires a Base URL")
@@ -191,11 +194,12 @@ async def _call_enterprise(
     if model:
         body["model"] = model
 
+    headers = {"Content-Type": "application/json", hn: api_key, **(extra_headers or {})}
     async with httpx.AsyncClient(timeout=120) as client:
         res = await client.post(
             f"{base_url}/llm/invoke",
             json=body,
-            headers={"Content-Type": "application/json", hn: api_key},
+            headers=headers,
         )
 
     if not res.is_success:

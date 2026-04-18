@@ -10,6 +10,7 @@ export interface LLMConfig {
   contextField?: string
   responseField?: string
   headerName?: string
+  extraHeaders?: Record<string, string>
 }
 
 export type NodeRole =

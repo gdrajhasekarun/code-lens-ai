@@ -69,7 +69,9 @@ export async function fetchFile(
     if (!res.ok) return ''
     const data = (await res.json()) as { content?: string; encoding?: string }
     if (data.encoding !== 'base64' || !data.content) return ''
-    return Buffer.from(data.content.replace(/\n/g, ''), 'base64').toString('utf-8')
+    const base64 = data.content.replace(/\n/g, '')
+    const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+    return new TextDecoder().decode(bytes)
   } catch {
     return ''
   }

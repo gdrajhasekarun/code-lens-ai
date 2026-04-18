@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect } from 'react'
 import {
   ReactFlow,
   Background,
@@ -45,8 +45,11 @@ function getRoleColor(role: string) {
   return ROLE_COLORS[role] ?? '#888780'
 }
 
-function CustomNode({ data }: NodeProps) {
-  const color = getRoleColor((data as ArchNode).role)
+// Typed React Flow node
+type ArchFlowNode = Node<ArchNode, 'custom'>
+
+function CustomNode({ data }: NodeProps<ArchFlowNode>) {
+  const color = getRoleColor(data.role)
   return (
     <div
       style={{
@@ -60,7 +63,6 @@ function CustomNode({ data }: NodeProps) {
         cursor: 'pointer',
         transition: 'box-shadow 150ms ease',
       }}
-      className="node-card"
       onMouseEnter={(e) => {
         ;(e.currentTarget as HTMLElement).style.boxShadow = `0 0 0 2px ${color}40`
       }}
@@ -81,17 +83,10 @@ function CustomNode({ data }: NodeProps) {
           maxWidth: 180,
         }}
       >
-        {(data as ArchNode).label}
+        {data.label}
       </div>
-      <div
-        style={{
-          marginTop: 4,
-          fontSize: 10,
-          color,
-          fontWeight: 500,
-        }}
-      >
-        {(data as ArchNode).role}
+      <div style={{ marginTop: 4, fontSize: 10, color, fontWeight: 500 }}>
+        {data.role}
       </div>
       <Handle type="source" position={Position.Bottom} style={{ background: color }} />
     </div>
@@ -100,7 +95,10 @@ function CustomNode({ data }: NodeProps) {
 
 const nodeTypes = { custom: CustomNode }
 
-function layoutGraph(archNodes: ArchNode[], archEdges: { from: string; to: string; label?: string }[]) {
+function layoutGraph(
+  archNodes: ArchNode[],
+  archEdges: { from: string; to: string; label?: string }[]
+): { nodes: ArchFlowNode[]; edges: Edge[] } {
   const g = new dagre.graphlib.Graph()
   g.setDefaultEdgeLabel(() => ({}))
   g.setGraph({ rankdir: 'TB', nodesep: 60, ranksep: 80 })
@@ -121,11 +119,11 @@ function layoutGraph(archNodes: ArchNode[], archEdges: { from: string; to: strin
 
   dagre.layout(g)
 
-  const nodes: Node[] = sorted.map((node) => {
+  const nodes: ArchFlowNode[] = sorted.map((node) => {
     const pos = g.node(node.id)
     return {
       id: node.id,
-      type: 'custom',
+      type: 'custom' as const,
       position: { x: pos.x - 100, y: pos.y - 35 },
       data: node,
     }
@@ -157,8 +155,8 @@ interface NodeGraphProps {
 }
 
 export default function NodeGraph({ graph, onNodeClick, height = 520 }: NodeGraphProps) {
-  const [nodes, setNodes, onNodesChange] = useNodesState([])
-  const [edges, setEdges, onEdgesChange] = useEdgesState([])
+  const [nodes, setNodes, onNodesChange] = useNodesState<ArchFlowNode>([])
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([])
 
   useEffect(() => {
     const { nodes: n, edges: e } = layoutGraph(graph.nodes, graph.edges)
@@ -167,8 +165,8 @@ export default function NodeGraph({ graph, onNodeClick, height = 520 }: NodeGrap
   }, [graph, setNodes, setEdges])
 
   const handleNodeClick = useCallback(
-    (_: React.MouseEvent, node: Node) => {
-      onNodeClick?.(node.data as ArchNode)
+    (_: React.MouseEvent, node: ArchFlowNode) => {
+      onNodeClick?.(node.data)
     },
     [onNodeClick]
   )

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode'
-import { AnalysisPanel } from './AnalysisPanel'
-import { SecretManager } from './SecretManager'
+import { AnalysisPanel } from './AnalysisPanel.js'
+import { SecretManager } from './SecretManager.js'
 
 export function activate(context: vscode.ExtensionContext) {
   const secretManager = new SecretManager(context)

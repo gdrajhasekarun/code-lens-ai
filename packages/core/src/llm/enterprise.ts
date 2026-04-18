@@ -1,4 +1,4 @@
-import type { LLMConfig } from '../types'
+import type { LLMConfig } from '../types.js'
 
 export async function callEnterprise(
   config: LLMConfig,

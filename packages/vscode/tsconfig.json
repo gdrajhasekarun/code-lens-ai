@@ -9,9 +9,10 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "types": ["node"],
     "declaration": true,
     "paths": {
-      "@codelens-ai/core": ["../../core/src/index.ts"]
+      "@codelens-ai/core": ["./src/codelens-ai-core.d.ts"]
     }
   },
   "include": ["src/**/*"],

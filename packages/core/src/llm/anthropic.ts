@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import type { LLMConfig } from '../types'
+import type { LLMConfig } from '../types.js'
 
 function getClient(config: LLMConfig): Anthropic {
   return new Anthropic({

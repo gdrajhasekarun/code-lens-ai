@@ -1,4 +1,4 @@
-import type { LLMConfig } from '../types'
+import type { LLMConfig } from '../types.js'
 
 const BASE_URL = 'https://openrouter.ai/api/v1'
 

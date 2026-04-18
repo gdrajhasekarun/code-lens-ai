@@ -1,4 +1,4 @@
-import type { LLMConfig } from '../types'
+import type { LLMConfig } from '../types.js'
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta'
 

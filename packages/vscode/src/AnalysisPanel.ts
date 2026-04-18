@@ -3,8 +3,8 @@ import * as path from 'path'
 import * as fs from 'fs'
 import { streamLLM, callLLM } from '@codelens-ai/core'
 import type { LLMConfig, LLMProvider } from '@codelens-ai/core'
-import type { SecretManager } from './SecretManager'
-import { WorkspaceReader } from './WorkspaceReader'
+import type { SecretManager } from './SecretManager.js'
+import { WorkspaceReader } from './WorkspaceReader.js'
 
 type InboundMessage =
   | { type: 'REQUEST_TREE' }

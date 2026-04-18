@@ -1,5 +1,5 @@
-import { callLLM } from './llm/adapter'
-import type { LLMConfig } from './types'
+import { callLLM } from './llm/adapter.js'
+import type { LLMConfig } from './types.js'
 
 const SYSTEM = `You are an expert analyzing a keyword-driven Java test automation framework.
 In this framework, test execution is driven by method names stored in Excel sheets.

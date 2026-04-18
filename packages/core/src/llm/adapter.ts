@@ -1,9 +1,9 @@
-import type { LLMConfig } from '../types'
-import { callAnthropic, streamAnthropic } from './anthropic'
-import { callOpenAI, streamOpenAI } from './openai'
-import { callOpenRouter, streamOpenRouter } from './openrouter'
-import { callGemini, streamGemini } from './gemini'
-import { callEnterprise, streamEnterprise } from './enterprise'
+import type { LLMConfig } from '../types.js'
+import { callAnthropic, streamAnthropic } from './anthropic.js'
+import { callOpenAI, streamOpenAI } from './openai.js'
+import { callOpenRouter, streamOpenRouter } from './openrouter.js'
+import { callGemini, streamGemini } from './gemini.js'
+import { callEnterprise, streamEnterprise } from './enterprise.js'
 
 export async function callLLM(
   config: LLMConfig,

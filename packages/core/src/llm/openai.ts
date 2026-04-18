@@ -1,5 +1,5 @@
 import OpenAI, { AzureOpenAI } from 'openai'
-import type { LLMConfig } from '../types'
+import type { LLMConfig } from '../types.js'
 
 function getClient(config: LLMConfig): OpenAI {
   if (config.provider === 'azure') {

@@ -46,7 +46,7 @@ function getRoleColor(role: string) {
 }
 
 // Typed React Flow node
-type ArchFlowNode = Node<ArchNode, 'custom'>
+type ArchFlowNode = Node<ArchNode & Record<string, unknown>, 'custom'>
 
 function CustomNode({ data }: NodeProps<ArchFlowNode>) {
   const color = getRoleColor(data.role)
@@ -125,7 +125,7 @@ function layoutGraph(
       id: node.id,
       type: 'custom' as const,
       position: { x: pos.x - 100, y: pos.y - 35 },
-      data: node,
+      data: node as ArchNode & Record<string, unknown>,
     }
   })
 
@@ -173,7 +173,7 @@ export default function NodeGraph({ graph, onNodeClick, height = 520 }: NodeGrap
 
   return (
     <div style={{ height, background: '#0d1117', borderRadius: 8, border: '1px solid #30363d' }}>
-      <ReactFlow
+      <ReactFlow<ArchFlowNode, Edge>
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
@@ -187,7 +187,7 @@ export default function NodeGraph({ graph, onNodeClick, height = 520 }: NodeGrap
         <Background color="#21262d" gap={20} variant={BackgroundVariant.Dots} />
         <Controls style={{ background: '#161b22', border: '1px solid #30363d' }} />
         <MiniMap
-          nodeColor={(n) => getRoleColor((n.data as ArchNode).role)}
+          nodeColor={(n) => getRoleColor((n.data as unknown as ArchNode).role)}
           style={{ background: '#161b22', border: '1px solid #30363d' }}
           maskColor="rgba(13,17,23,0.7)"
         />

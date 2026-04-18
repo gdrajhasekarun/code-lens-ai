@@ -22,6 +22,8 @@ export async function callLLM(
       return callGemini(config, system, prompt)
     case 'enterprise':
       return callEnterprise(config, system, prompt)
+    case 'copilot':
+      throw new Error('Copilot provider is only available inside the VS Code extension.')
     default:
       throw new Error(`Unknown provider: ${(config as LLMConfig).provider}`)
   }
@@ -49,6 +51,8 @@ export async function* streamLLM(
     case 'enterprise':
       yield* streamEnterprise(config, system, prompt)
       break
+    case 'copilot':
+      throw new Error('Copilot provider is only available inside the VS Code extension.')
     default:
       throw new Error(`Unknown provider: ${(config as LLMConfig).provider}`)
   }

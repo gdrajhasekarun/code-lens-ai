@@ -9,8 +9,8 @@ import { WorkspaceReader } from './WorkspaceReader'
 type InboundMessage =
   | { type: 'REQUEST_TREE' }
   | { type: 'REQUEST_FILES'; paths: string[] }
-  | { type: 'LLM_STREAM'; streamId: string; provider: string; apiKey: string; model: string; baseUrl?: string; apiVersion?: string; promptField?: string; contextField?: string; responseField?: string; headerName?: string; system: string; prompt: string }
-  | { type: 'LLM_CALL'; callId: string; provider: string; apiKey: string; model: string; baseUrl?: string; apiVersion?: string; promptField?: string; contextField?: string; responseField?: string; headerName?: string; system: string; prompt: string }
+  | { type: 'LLM_STREAM'; streamId: string; provider: string; apiKey: string; model: string; baseUrl?: string; apiVersion?: string; promptField?: string; contextField?: string; responseField?: string; headerName?: string; extraHeaders?: Record<string, string>; system: string; prompt: string }
+  | { type: 'LLM_CALL'; callId: string; provider: string; apiKey: string; model: string; baseUrl?: string; apiVersion?: string; promptField?: string; contextField?: string; responseField?: string; headerName?: string; extraHeaders?: Record<string, string>; system: string; prompt: string }
   | { type: 'SAVE_KEY'; provider: string; apiKey: string }
   | { type: 'GET_SETTINGS' }
 
@@ -51,7 +51,6 @@ export class AnalysisPanel {
       this.disposables
     )
 
-    // Send init after a short delay for the webview to load
     setTimeout(() => {
       const wsName = vscode.workspace.name ?? path.basename(this.rootPath ?? 'workspace')
       this.panel.webview.postMessage({
@@ -93,6 +92,10 @@ export class AnalysisPanel {
         break
       }
       case 'LLM_STREAM': {
+        if (msg.provider === 'copilot') {
+          await this.streamCopilot(msg.system, msg.prompt, msg.streamId)
+          break
+        }
         const config: LLMConfig = {
           provider: msg.provider as LLMProvider,
           apiKey: msg.apiKey,
@@ -103,6 +106,7 @@ export class AnalysisPanel {
           contextField: msg.contextField,
           responseField: msg.responseField,
           headerName: msg.headerName,
+          extraHeaders: msg.extraHeaders,
         }
         try {
           for await (const token of streamLLM(config, msg.system, msg.prompt)) {
@@ -119,6 +123,10 @@ export class AnalysisPanel {
         break
       }
       case 'LLM_CALL': {
+        if (msg.provider === 'copilot') {
+          await this.callCopilot(msg.system, msg.prompt, msg.callId)
+          break
+        }
         const config: LLMConfig = {
           provider: msg.provider as LLMProvider,
           apiKey: msg.apiKey,
@@ -129,6 +137,7 @@ export class AnalysisPanel {
           contextField: msg.contextField,
           responseField: msg.responseField,
           headerName: msg.headerName,
+          extraHeaders: msg.extraHeaders,
         }
         try {
           const content = await callLLM(config, msg.system, msg.prompt)
@@ -154,6 +163,79 @@ export class AnalysisPanel {
     }
   }
 
+  private async streamCopilot(system: string, prompt: string, streamId: string) {
+    try {
+      const models = await vscode.lm.selectChatModels({ vendor: 'copilot' })
+      if (!models.length) {
+        this.panel.webview.postMessage({
+          type: 'LLM_ERROR',
+          error: 'No Copilot model found. Make sure GitHub Copilot Chat is installed and signed in.',
+          streamId,
+        })
+        return
+      }
+
+      const model = models[0]
+      const messages = [
+        vscode.LanguageModelChatMessage.User(`${system}\n\n---\n\n${prompt}`),
+      ]
+      const cts = new vscode.CancellationTokenSource()
+      this.disposables.push(cts)
+
+      const response = await model.sendRequest(messages, {}, cts.token)
+
+      for await (const chunk of response.stream) {
+        if (chunk instanceof vscode.LanguageModelTextPart) {
+          this.panel.webview.postMessage({ type: 'LLM_TOKEN', token: chunk.value, streamId })
+        }
+      }
+      this.panel.webview.postMessage({ type: 'LLM_DONE', streamId })
+    } catch (err) {
+      this.panel.webview.postMessage({
+        type: 'LLM_ERROR',
+        error: (err as Error).message,
+        streamId,
+      })
+    }
+  }
+
+  private async callCopilot(system: string, prompt: string, callId: string) {
+    try {
+      const models = await vscode.lm.selectChatModels({ vendor: 'copilot' })
+      if (!models.length) {
+        this.panel.webview.postMessage({
+          type: 'LLM_ERROR',
+          error: 'No Copilot model found. Make sure GitHub Copilot Chat is installed and signed in.',
+          streamId: callId,
+        })
+        return
+      }
+
+      const model = models[0]
+      const messages = [
+        vscode.LanguageModelChatMessage.User(`${system}\n\n---\n\n${prompt}`),
+      ]
+      const cts = new vscode.CancellationTokenSource()
+      this.disposables.push(cts)
+
+      const response = await model.sendRequest(messages, {}, cts.token)
+
+      let content = ''
+      for await (const chunk of response.stream) {
+        if (chunk instanceof vscode.LanguageModelTextPart) {
+          content += chunk.value
+        }
+      }
+      this.panel.webview.postMessage({ type: 'LLM_DONE', streamId: callId, token: content })
+    } catch (err) {
+      this.panel.webview.postMessage({
+        type: 'LLM_ERROR',
+        error: (err as Error).message,
+        streamId: callId,
+      })
+    }
+  }
+
   private buildHtml(context: vscode.ExtensionContext): string {
     const distPath = path.join(context.extensionPath, 'dist')
 
@@ -167,7 +249,6 @@ export class AnalysisPanel {
     const indexHtml = fs.readFileSync(path.join(distPath, 'index.html'), 'utf-8')
     const webview = this.panel.webview
 
-    // Rewrite asset URLs to webview URIs
     const rewritten = indexHtml
       .replace(/(src|href)="\/([^"]+)"/g, (_, attr, src) => {
         const uri = webview.asWebviewUri(vscode.Uri.file(path.join(distPath, src)))

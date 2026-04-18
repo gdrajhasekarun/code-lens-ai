@@ -3,7 +3,10 @@ import { useAnalysisStore } from '../store/analysisStore'
 import { apiCallLLM } from '../api'
 import type { LLMConfig, LLMProvider } from '@codelens-ai/core'
 
-const PROVIDERS: { id: LLMProvider; label: string }[] = [
+const IS_VSCODE = typeof window !== 'undefined' && window.VITE_TARGET === 'vscode'
+
+const PROVIDERS: { id: LLMProvider; label: string; vscodeOnly?: boolean }[] = [
+  { id: 'copilot', label: 'GitHub Copilot', vscodeOnly: true },
   { id: 'anthropic', label: 'Claude' },
   { id: 'openai', label: 'OpenAI' },
   { id: 'azure', label: 'Azure OpenAI' },
@@ -13,6 +16,7 @@ const PROVIDERS: { id: LLMProvider; label: string }[] = [
 ]
 
 const DEFAULT_MODELS: Record<LLMProvider, string> = {
+  copilot: '',
   anthropic: 'claude-sonnet-4-20250514',
   openai: 'gpt-4o',
   azure: 'gpt-4o',
@@ -22,6 +26,7 @@ const DEFAULT_MODELS: Record<LLMProvider, string> = {
 }
 
 const MODEL_OPTIONS: Record<LLMProvider, string[]> = {
+  copilot: [],
   anthropic: ['claude-sonnet-4-20250514', 'claude-opus-4-20250514', 'claude-haiku-4-5-20251001'],
   openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
   azure: [],
@@ -227,7 +232,7 @@ export default function SettingsModal({ onClose }: Props) {
         <section style={{ marginBottom: 20 }}>
           <label style={labelStyle}>Provider</label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {PROVIDERS.map((p) => (
+            {PROVIDERS.filter(p => !p.vscodeOnly || IS_VSCODE).map((p) => (
               <button
                 key={p.id}
                 onClick={() => setProvider(p.id)}
@@ -249,17 +254,39 @@ export default function SettingsModal({ onClose }: Props) {
           </div>
         </section>
 
-        {/* API Key */}
-        <section style={{ marginBottom: 16 }}>
-          <label style={labelStyle}>API Key</label>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            placeholder="sk-..."
-            style={inputStyle}
-          />
-        </section>
+        {/* API Key — hidden for Copilot */}
+        {provider === 'copilot' ? (
+          <div style={{
+            background: '#0d1117',
+            border: '1px solid #21262d',
+            borderRadius: 6,
+            padding: '12px 14px',
+            marginBottom: 16,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}>
+            <span style={{ fontSize: 18 }}>🤖</span>
+            <div>
+              <p style={{ color: '#e6edf3', fontSize: 13, fontWeight: 600 }}>No API key needed</p>
+              <p style={{ color: '#8b949e', fontSize: 12, marginTop: 2 }}>
+                Uses your existing GitHub Copilot subscription via VS Code.
+                Make sure <strong style={{ color: '#e6edf3' }}>GitHub Copilot Chat</strong> is installed and signed in.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <section style={{ marginBottom: 16 }}>
+            <label style={labelStyle}>API Key</label>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="sk-..."
+              style={inputStyle}
+            />
+          </section>
+        )}
 
         {/* Azure extras */}
         {provider === 'azure' && (
@@ -409,8 +436,8 @@ export default function SettingsModal({ onClose }: Props) {
           </>
         )}
 
-        {/* Model — skip for enterprise (handled above in grid) */}
-        {provider !== 'enterprise' && (
+        {/* Model — skip for enterprise and copilot */}
+        {provider !== 'enterprise' && provider !== 'copilot' && (
           <section style={{ marginBottom: 20 }}>
             <label style={labelStyle}>Model</label>
             {MODEL_OPTIONS[provider].length > 0 ? (
@@ -444,7 +471,7 @@ export default function SettingsModal({ onClose }: Props) {
           >
             {testStatus === 'testing' ? 'Testing…' : 'Test Connection'}
           </button>
-          <button onClick={handleSave} disabled={!apiKey} style={primaryBtnStyle}>
+          <button onClick={handleSave} disabled={provider !== 'copilot' && !apiKey} style={primaryBtnStyle}>
             Save
           </button>
           {testStatus === 'ok' && (

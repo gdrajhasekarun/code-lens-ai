@@ -1,4 +1,4 @@
-export type LLMProvider = 'anthropic' | 'openai' | 'azure' | 'openrouter' | 'gemini' | 'enterprise'
+export type LLMProvider = 'anthropic' | 'openai' | 'azure' | 'openrouter' | 'gemini' | 'enterprise' | 'copilot'
 
 export interface LLMConfig {
   provider: LLMProvider
